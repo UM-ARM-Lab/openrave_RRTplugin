@@ -1,4 +1,4 @@
-openrave_plugin
+openrave_RRTplugin
 ===============
 openrave_plugin is a utility package that simplifies packaging of
 [OpenRAVE](http://openrave.org/) models, plugins, and databases assets in a

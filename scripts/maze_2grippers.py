@@ -1,5 +1,7 @@
 import time
 import openravepy
+import rospkg
+import rospy
 
 #### YOUR IMPORTS GO HERE ####
 

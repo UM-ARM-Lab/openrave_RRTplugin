@@ -1,5 +1,7 @@
-#ifndef VICTOR_ROS_JOINT_POSITION_CONTROLLER_H
-#define VICTOR_ROS_JOINT_POSITION_CONTROLLER_H
+#ifndef OR_RRT_PLUGIN_H
+#define OR_RRT_PLUGIN_H
+
+#include <openrave_rrtplugin/include/openrave_rrtplugin/rrtHelper.h>
 
 #include <atomic>
 #include <thread>
@@ -8,6 +10,71 @@
 #include <openrave/plugin.h>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
+
+using namespace OpenRAVE;
+
+namespace my_plugin {
+
+    class MyNewModule : public ModuleBase
+    {
+    public:
+        MyNewModule(EnvironmentBasePtr penv, std::istream& ss) : ModuleBase(penv) {
+
+            penv_=penv;
+
+            RegisterCommand("MyCommand",boost::bind(&MyNewModule::MyCommand,this,_1,_2),
+                            "This is an example command");
+
+            RegisterCommand("goal",boost::bind(&MyNewModule::SetGoal,this,_1,_2),
+                            "goal %f %f %f %f %f %f %f;");
+
+            RegisterCommand("bias",boost::bind(&MyNewModule::SetBias,this,_1,_2),
+                            "bias %f;");
+
+            RegisterCommand("step",boost::bind(&MyNewModule::SetStep,this,_1,_2),
+                            "step %f;");
+
+            RegisterCommand("isBiRRT",boost::bind(&MyNewModule::SetBiRRT,this,_1,_2),
+                            "isBiRRT %d;");
+
+            RegisterCommand("SetWeight",boost::bind(&MyNewModule::SetWeight,this,_1,_2),
+                            "SetWeight ;");
+
+            RegisterCommand("SetUpperBound",boost::bind(&MyNewModule::SetUpperBound,this,_1,_2),
+                            "SetUpperBound %f %f %f %f %f %f %f;");
+
+            RegisterCommand("SetLowerBound",boost::bind(&MyNewModule::SetLowerBound,this,_1,_2),
+                            "SetLowerBound %f %f %f %f %f %f %f;");
+
+            RegisterCommand("RRT",boost::bind(&MyNewModule::RRT,this,_1,_2),
+                            "Run RRT");
+
+            RegisterCommand("BiRRT",boost::bind(&MyNewModule::BiRRT,this,_1,_2),
+                            "Run BiRRT");
+
+            RegisterCommand("Smooth",boost::bind(&MyNewModule::Smooth,this,_1,_2),
+                            "Smooth %d;");
+
+            RegisterCommand("getRRTpath",boost::bind(&MyNewModule::GetRRTPath,this,_1,_2),
+                            "Path %d;");
+
+
+        }
+        virtual ~MyNewModule() {}
+
+        EnvironmentBasePtr penv_;
+    //    ParameterSet plannerSetup;
+
+        configSet goalConfig;
+        float goalBias = SAMPLEBIAS;
+        float stepSize = STEPSIZE;
+        int smooth = 0;
+        int isBiRRT = 0;
+        std::vector<RRTNode*> path;
+    };
+
+
+}
 
 
 namespace armlab_or_plugins

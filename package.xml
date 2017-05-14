@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package>
-  <name>openrave_RRTplugin</name>
+  <name>openrave_rrtplugin</name>
   <version>0.0.0</version>
   <description>Utilities for building OpenRAVE plugins in a Catkin workspace.</description>
   <!-- One maintainer tag required, multiple allowed, one person per tag -->

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(openrave_RRTplugin)
+project(openrave_rrtplugin)
 
 set(CATKIN_PACKAGES
     openrave_catkin
@@ -48,10 +48,14 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -O0 -g -Wall -Wextra -Wpedant
 
 # Stub library that registers the plugins with OpenRAVE.
 openrave_plugin(${PROJECT_NAME}_plugin
-    include/openrave_RRTplugin/victor_ros_joint_position_controller.h
-    src/victor_ros_joint_position_controller.cpp
-#    src/rrt_plugin.cpp
-#    src/plugindefs.h
+#    include/openrave_rrtplugin/or_rrt_plugin.h
+    include/openrave_rrtplugin/orplugin.h
+#    include/openrave_rrtplugin/rrtHelpler.h
+#    include/rrtHelpler.h
+#    src/or_rrt_plugin.cpp
+    src/orplugin.cpp
+    src/rrtHelper.h
+    src/rrtHelper.cpp
 )
 target_link_libraries(${PROJECT_NAME}_plugin
 #    ${PROJECT_NAME}
@@ -64,10 +68,12 @@ target_link_libraries(${PROJECT_NAME}_plugin
 ## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
 # catkin_python_setup()
 
-FILE(GLOB hpp_SRC "include/${PROJECT_NAME}/*.hpp")
-FILE(GLOB h_SRC "include/${PROJECT_NAME}/*.h")
-FILE(GLOB cpp_SRC "src/*.cpp")
+#FILE(GLOB hpp_SRC "include/${PROJECT_NAME}/*.hpp")
+#FILE(GLOB h_SRC "include/${PROJECT_NAME}/*.h")
+#FILE(GLOB h_SRC "include/rrtHelper.h")
+#FILE(GLOB cpp_SRC "src/*.cpp")
 #FILE(GLOB py_SRC "scripts/*.py")
+
 
 #############
 ## Install ##

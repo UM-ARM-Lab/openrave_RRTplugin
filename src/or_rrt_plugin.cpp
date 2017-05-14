@@ -1,4 +1,5 @@
-#include "openrave_RRTplugin/victor_ros_joint_position_controller.h"
+#include "openrave_rrtplugin/or_rrt_plugin.h"
+
 
 #include <boost/bind.hpp>
 #include <victor_hardware_interface/MotionCommand.h>
@@ -7,6 +8,8 @@
 #include <arc_utilities/eigen_helpers.hpp>
 
 using namespace OpenRAVE;
+using namespace my_plugin;
+
 using namespace armlab_or_plugins;
 
 

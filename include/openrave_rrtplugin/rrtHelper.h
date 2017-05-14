@@ -32,7 +32,7 @@ namespace orPlugin {
 
     typedef std::vector<double> configuration;
 //    typedef Eigen::Affine3d tConfiguration;
-    typedef std::vector<configuration> configSet;
+    typedef std::pair<configuration, configuration> configSet;
     typedef std::pair<Eigen::Affine3d, Eigen::Affine3d> tConfigSet;
 
     typedef configSet* configSetPtr;
@@ -47,7 +47,6 @@ namespace orPlugin {
 
     class RRTNode
     {
-
     public:
         RRTNode();
         RRTNode(configSet configSetIn);
@@ -158,7 +157,6 @@ namespace orPlugin {
 
 
         ////////////////////// Helper function for configuration SET (Pair)
-        ///
 
         void SetConfigPrintHelp(configSet config);
 

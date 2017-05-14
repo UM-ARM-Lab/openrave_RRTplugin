@@ -2,7 +2,7 @@
 #define RRTHELPER_H
 
 #include <openrave/openrave.h>
-#include <openrave/plugin.h>
+//#include <openrave/plugin.h>
 
 #include <iostream>
 #include <stdio.h>
@@ -10,7 +10,6 @@
 
 #include <boost/bind.hpp>
 #include <time.h>
-#include <stdlib.h>
 
 #include <arc_utilities/arc_helpers.hpp>
 
@@ -53,7 +52,7 @@ namespace orPlugin {
         RRTNode(configSet configSetIn);
         ~RRTNode();
 
-        bool SameNode(RRTNodePtr checkNode);
+//        bool SameNode(RRTNodePtr checkNode);
         void SetConfig(configSet config);
         configSet GetConfig();
         void AddStep(configSet s);
@@ -120,6 +119,12 @@ namespace orPlugin {
 
     };
 
+    /////////////////////////// Helper function /////////////////////////////////
+
+    float Distance(configuration A, configuration B);
+    bool SameNode(RRTNodePtr baseNode, RRTNodePtr checkNode);
+
+
     class RrtPlanner
     {
     public:
@@ -150,15 +155,18 @@ namespace orPlugin {
         // A-B
         configuration SubtractConfig(configuration A, configuration B);
 
-        float Distance(configuration A, configuration B);
-        float WeightedDis(configuration A, configuration B);
-
         // return unitstep vector, the step size is in #define, could be adjust later
         configuration UnitStep(configuration start, configuration goal, float stepSize);
+
+//        float Distance(configuration A, configuration B);
+
+        float WeightedDis(configuration A, configuration B);
 
 
         ////////////////////// Helper function for configuration SET (Pair)
         ///
+
+//        bool SameNode(RRTNodePtr baseNode, RRTNodePtr checkNode);
 
         void SetConfigPrintHelp(configSet config);
 

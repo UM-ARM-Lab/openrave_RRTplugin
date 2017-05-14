@@ -112,22 +112,6 @@ namespace orPlugin{
     //    parentNode->SetChild(this);
     }
 
-    bool RRTNode::SameNode(RRTNode *checkNode)
-    {
-        configSet config = checkNode->GetConfig();
-        float error = 0;
-
-        for(int i =0; i<config.size(); i++)
-        {
-            float ele_error = WeightedDis(config.at(i),configSet_.at(i)) ;
-            error = error+ele_error;
-        }
-
-        if (error<ERRORTHRESHOLD){ return true; }
-        return false;
-    }
-
-
     ///////////////////// NodeTree Class ///////////////////////////
     /// \brief NodeTree::NodeTree
     /// \param initNode
@@ -154,7 +138,7 @@ namespace orPlugin{
     {
         for (std::vector<RRTNode*>::iterator i=tree_.begin(); i!=tree_.end(); i++)
         {
-            if((*i)->SameNode(testNode)){ return true; }
+            if(SameNode((*i),testNode)){ return true; }
         }
         return false;
     }
@@ -179,9 +163,9 @@ namespace orPlugin{
         }
         for(tree::iterator i = tree_.begin()+1; i!=tree_.end(); i++)
         {
-            if(((*i)->GetParent())->SameNode(remNode))
+            if(SameNode(((*i)->GetParent()),remNode))
                 (*i)->SetParent(remNode->GetParent());
-            if(remNode->SameNode(*i))
+            if(SameNode(remNode,*i))
                 tree_.erase(i);
         }
         return true;
@@ -202,7 +186,7 @@ namespace orPlugin{
     int NodeTree::GetIndex(RRTNode * findNode)
     {
         for (int i = 0; i<tree_.size(); i++){
-            if(findNode->SameNode(tree_.at(i)))
+            if(SameNode(findNode, tree_.at(i)))
                 return i;
         }
         return -1;
@@ -210,7 +194,7 @@ namespace orPlugin{
 
     bool NodeTree::IsRoot(RRTNode *checkNode)
     {
-        if(checkNode->SameNode(rootNode_))
+        if(SameNode(checkNode, rootNode_))
             return true;
         return false;
     }
@@ -250,6 +234,38 @@ namespace orPlugin{
         }
 
     }
+
+    // euclidian distance
+     float Distance(configuration A, configuration B)
+     {
+         float distance = 0;
+         for(int i =0; i<A.size(); i++)
+         {
+             float ele_error;
+             ele_error = std::pow(A.at(i)-B.at(i),2);
+             distance = distance+ele_error;
+         }
+         return std::sqrt(distance);
+     }
+
+     bool SameNode(RRTNodePtr baseNode, RRTNodePtr checkNode)
+     {
+         configSet config = checkNode->GetConfig();
+         configSet baseConfig = baseNode->GetConfig();
+
+         float error = 0;
+
+         for(int i =0; i<config.size(); i++)
+         {
+             float ele_error = Distance(config.at(i),baseConfig.at(i)) ;
+             error = error+ele_error;
+         }
+
+         if (error<ERRORTHRESHOLD){ return true; }
+         return false;
+     }
+
+
 
 
      ////////////////////////////////// Helper function //////////////////////////
@@ -340,19 +356,6 @@ namespace orPlugin{
         return sum;
     }
 
-    // euclidian distance
-     float RrtPlanner::Distance(configuration A, configuration B)
-     {
-         float distance = 0;
-         for(int i =0; i<A.size(); i++)
-         {
-             float ele_error;
-             ele_error = std::pow(A.at(i)-B.at(i),2);
-             distance = distance+ele_error;
-         }
-         return std::sqrt(distance);
-     }
-
      float RrtPlanner::WeightedDis(configuration A, configuration B)
      {
          float distance = 0;
@@ -413,8 +416,9 @@ namespace orPlugin{
 
 
 
-    //////////////////////////////////// New / Revised function from HW3 for Project
-    ///
+     //////////////////////////////////// New / Revised function from HW3 for Project
+     ///
+
 
     void RrtPlanner::SetConfigPrintHelp(configSet config)
     {

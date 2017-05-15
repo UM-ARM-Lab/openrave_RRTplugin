@@ -37,8 +37,11 @@ namespace orPlugin {
     typedef configSet* configSetPtr;
     typedef tConfigSet* tConfigSetPtr;
 
-    configuration TtoVconfig(Eigen::Affine3d tConfig);
-    configSet SetTtoVconfig(tConfigSet tConfigSetIn);
+    configuration SE3toVconfig(Eigen::Affine3d tConfig);
+    configSet SetSE3toVconfig(tConfigSet tConfigSetIn);
+
+    Eigen::Affine3d VtoSE3config(configuration config);
+    tConfigSet SetVtoSE3config(configSet config);
 
     class RRTNode;
     typedef RRTNode* RRTNodePtr;
@@ -57,20 +60,20 @@ namespace orPlugin {
         configSet GetConfig();
         void AddStep(configSet s);
 
-        void SetParent(RRTNodePtr);
+        void SetParent(RRTNodePtr parentNode);
         RRTNodePtr GetParent();
 
         // NEWLY DECLARED FUNCTION, TO BE IMPLEMENT
-        bool IsChild(RRTNodePtr);
-        void SetChild(RRTNodePtr);
-        std::vector<RRTNodePtr> GetChild();
+//        bool IsChild(RRTNodePtr nodePtr);
+//        void SetChild(RRTNodePtr nodePtr);
+//        std::vector<RRTNodePtr> GetChild();
 
     private:
         configSet configSet_;
         RRTNodePtr parent_;
 
         // NEWLY DECLARED VARIABLE
-        std::vector<RRTNodePtr> children_;
+//        std::vector<RRTNodePtr> children_;
     };
 
     class NodeTree
@@ -82,6 +85,7 @@ namespace orPlugin {
 
         RRTNodePtr GetRoot();
 
+        void ResetTree();
         bool InTree(RRTNodePtr testNode);
         bool Add(RRTNodePtr growNode);
         bool Remove(RRTNodePtr remNode);
@@ -103,6 +107,7 @@ namespace orPlugin {
     {
     public:
         ParameterSet();
+
     //    ~ParameterSet();
 
         // Geodesic of (i,j) gripper stored in i*n+j; n is num of grippers
@@ -117,7 +122,14 @@ namespace orPlugin {
         configSet geodesicConfig;
         std::vector<float> geodesic;
 
+        configSet start_;
+        configSet goal_;
+        tConfigSet startSE3_;
+        tConfigSet goalSE3_;
+
     };
+
+    typedef NodeTree* NodeTreePtr;
 
     /////////////////////////// Helper function /////////////////////////////////
 
@@ -135,6 +147,8 @@ namespace orPlugin {
         ParameterSet GetParameters();
 
         ///////////////////////// RRT planner helper function, for single configuration
+
+        void ResetPath();
 
         int RandNode(int size);
 
@@ -185,7 +199,7 @@ namespace orPlugin {
         configSet SetSubtractConfig(configSet A, configSet B);  // A-B
 
         // Nearest Node on the tree
-        RRTNode* NearestNode(NodeTree* treeA, configSet config);
+        RRTNode* NearestNode(configSet config);
 
         configSet SampleSet(int gripperSize);
 
@@ -216,26 +230,19 @@ namespace orPlugin {
         //                 configuration goalConfig, float sampleBias, float stepSize, configuration weightIn);
 
 
-        std::vector<RRTNode*> SmoothPath(EnvironmentBasePtr env, std::vector<RRTNode *> &path,float stepSize, int iteration);
-
+//        std::vector<RRTNode*> SmoothPath(EnvironmentBasePtr env, std::vector<RRTNode *> &path,float stepSize, int iteration);
+        std::vector<RRTNode*> SmoothPath(EnvironmentBasePtr env, float stepSize, int iteration);
 
         std::vector<RRTNode*> BiRRTPlanning(OpenRAVE::EnvironmentBasePtr env,
             configSet goalConfig, float sampleBias, float stepSize);
 
 
-
-
-
-
-
     protected:
         ParameterSet inputParameters_;
 
+        NodeTree* treePtr_;
 
-
-
-
-
+        std::vector<RRTNodePtr> path_;
 
     };
 

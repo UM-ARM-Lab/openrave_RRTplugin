@@ -34,12 +34,6 @@ namespace orPlugin {
     protected:
         std::vector<RobotBasePtr> robots_;
 
-
-
-
-
-
-
     };
 
 

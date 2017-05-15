@@ -23,12 +23,13 @@
 using namespace std;
 using namespace OpenRAVE;
 using namespace Eigen;
+using namespace EigenHelpers;
 
 
 namespace orPlugin{
 
 
-    configuration TtoVconfig(Eigen::Affine3d tConfig)
+    configuration SE3toVconfig(Eigen::Affine3d tConfig)
     {
         configuration config;
 
@@ -36,36 +37,66 @@ namespace orPlugin{
         for (int i = 0; i< vtrans.size(); i++)
         {  config.push_back(vtrans(i));}
 
-        Matrix3d m = tConfig.linear();
-        Vector3d eulerAngle = m.eulerAngles(0, 1, 2);
+//        Matrix3d m = tConfig.linear();
+//        Vector3d eulerAngle = m.eulerAngles(0, 1, 2);
+        Vector3d eulerAngle = EulerAnglesFromAffine3d(tConfig);
+
         for (int i = 0; i< eulerAngle.size(); i++)
         {  config.push_back(eulerAngle(i)); }
 
         return config;
     }
 
-    configSet SetTtoVconfig(tConfigSet tConfigSetIn)
+    configSet SetSE3toVconfig(tConfigSet tConfigSetIn)
     {
         configSet config;
-        config.push_back(TtoVconfig(tConfigSetIn.first));
-        config.push_back(TtoVconfig(tConfigSetIn.second));
+        config.push_back(SE3toVconfig(tConfigSetIn.first));
+        config.push_back(SE3toVconfig(tConfigSetIn.second));
 
         return config;
     }
 
+    Eigen::Affine3d VtoSE3config(configuration config)
+    {
+        Vector3d tran;
+        Vector3d eulerAngel;
+        for (int i = 0; i<3; i++)
+        {
+            tran(i) = config.at(i);
+            eulerAngel(i) = config.at(i+3);
+        }
 
-    RRTNode::RRTNode(){ parent_=NULL;  children_.clear();}
+//        Matrix3f m;
+//        m = AngleAxisf(angle1, Vector3f::UnitZ()) *AngleAxisf(angle2, Vector3f::UnitY()) *AngleAxisf(angle3, Vector3f::UnitZ());
+
+        Eigen::Affine3d res = TransformFromRPY(tran,eulerAngel);
+
+        return res;
+    }
+
+
+    tConfigSet SetVtoSE3config(configSet config)
+    {
+        tConfigSet res;
+        res.first = VtoSE3config(config.at(0));
+        res.second = VtoSE3config(config.at(1));
+
+        return res;
+    }
+
+
+    RRTNode::RRTNode(){ parent_=NULL;  }
 
     RRTNode::RRTNode(configSet configSetIn):configSet_(configSetIn)
     {
         parent_=NULL;
-        children_.clear();
+//        children_.clear();
     }
 
     RRTNode::~RRTNode()
     {
         parent_ = NULL;
-        children_.clear();
+//        children_.clear();
     }
 
     void RRTNode::SetConfig(configSet config)
@@ -77,11 +108,6 @@ namespace orPlugin{
     configSet RRTNode::GetConfig()
     {
         return configSet_;
-    }
-
-    RRTNode* RRTNode::GetParent()
-    {
-        return parent_;
     }
 
     void RRTNode::AddStep(configSet s)
@@ -106,11 +132,39 @@ namespace orPlugin{
 
     }
 
-    void RRTNode::SetParent(RRTNode* parentNode)
+    RRTNode* RRTNode::GetParent()
+    {
+        return parent_;
+    }
+
+    void RRTNode::SetParent(RRTNodePtr parentNode)
     {
         parent_ = parentNode;
-    //    parentNode->SetChild(this);
+
+//        parentNode->SetChild(this);
     }
+/*
+    bool RRTNode::IsChild(RRTNodePtr nodePtr)
+    {
+        for (int i =0; i<children_.size(); i++)
+        {
+            if(SameNode(children_.at(i),nodePtr))
+            {   return true;   }
+        }
+        return false;
+    }
+
+    void RRTNode::SetChild(RRTNodePtr nodePtr)
+    {
+        children_.push_back(nodePtr);
+        nodePtr->SetParent(this);
+    }
+
+    std::vector<RRTNodePtr> RRTNode::GetChild()
+    {
+        return children_;
+    }
+*/
 
     ///////////////////// NodeTree Class ///////////////////////////
     /// \brief NodeTree::NodeTree
@@ -125,6 +179,10 @@ namespace orPlugin{
 
     NodeTree::~NodeTree()
     {
+        while(!tree_.empty()) {
+               delete tree_.back();
+               tree_.pop_back();
+           }
 
         tree_.clear();
     }
@@ -134,7 +192,17 @@ namespace orPlugin{
         return rootNode_;
     }
 
-    bool NodeTree::InTree(RRTNode* testNode)
+    void NodeTree::ResetTree()
+    {
+        while(!tree_.empty()) {
+               delete tree_.back();
+               tree_.pop_back();
+           }
+
+        tree_.clear();
+    }
+
+    bool NodeTree::InTree(RRTNodePtr testNode)
     {
         for (std::vector<RRTNode*>::iterator i=tree_.begin(); i!=tree_.end(); i++)
         {
@@ -144,8 +212,9 @@ namespace orPlugin{
     }
 
     // double check this function later, for parent pointer issue
-    bool NodeTree::Add(RRTNode* growNode)
+    bool NodeTree::Add(RRTNodePtr growNode)
     {
+        if (tree_.empty()) { rootNode_=growNode;  }
         if (!InTree(growNode))
         {
             tree_.push_back(growNode);
@@ -215,7 +284,17 @@ namespace orPlugin{
     /////////////////////// ParameterSet Class /////////////////////////////
     // the config here is in object configuration space, with x,y,z
     // geodesicConfig dimension: 3*n
-    ParameterSet::ParameterSet(){}
+
+    ParameterSet::ParameterSet()
+    {
+        weight.clear();
+        weight.push_back(1);
+        weight.push_back(1);
+        weight.push_back(1);
+        weight.push_back(0);
+        weight.push_back(0);
+        weight.push_back(0);
+    }
 
     void ParameterSet::InitGeodesic(configSet initConfig)
     {
@@ -234,6 +313,8 @@ namespace orPlugin{
         }
 
     }
+
+    ////////////////////////////////// Helper function //////////////////////////
 
     // euclidian distance
      float Distance(configuration A, configuration B)
@@ -266,9 +347,14 @@ namespace orPlugin{
      }
 
 
+     //////////////////////////////// RrtPlanner ///////////////////////////////
 
+     void RrtPlanner::ResetPath()
+     {
+         treePtr_->ResetTree();
+         path_.clear();
+     }
 
-     ////////////////////////////////// Helper function //////////////////////////
 
      int RrtPlanner::RandNode(int size)
      {
@@ -370,15 +456,15 @@ namespace orPlugin{
      }
 
 
-     RRTNode* RrtPlanner::NearestNode(NodeTree* treeA, configSet config)
+     RRTNode* RrtPlanner::NearestNode(configSet config)
      {
-         RRTNode* nodePtr=treeA->GetRoot();
+         RRTNode* nodePtr=treePtr_->GetRoot();
          RRTNode* minNode = nodePtr;
          int index=0;
          float minDis=SetWeightedDis(nodePtr->GetConfig(),config);
-         for(int i=0; i<treeA->TreeSize(); i++)
+         for(int i=0; i<treePtr_->TreeSize(); i++)
          {
-             nodePtr = treeA->GetNode(i);
+             nodePtr = treePtr_->GetNode(i);
              float curDis = SetWeightedDis(nodePtr->GetConfig(),config);
              if(curDis<minDis)
              {
@@ -387,7 +473,7 @@ namespace orPlugin{
                  minDis = curDis;
              }
          }
-         return treeA->GetNode(index);
+         return treePtr_->GetNode(index);
      }
 
      configuration RrtPlanner::RandSample()
@@ -541,12 +627,10 @@ namespace orPlugin{
         return setStep;
     }
 
-
-
     ///////////// Rave related function
 
-    /*
-    configuration RaveVecToConfig(OpenRAVE::Vector raveVec)
+
+    configuration RrtPlanner::RaveVecToConfig(OpenRAVE::Vector raveVec)
     {
         configuration pos;
         double x=raveVec.x;
@@ -559,7 +643,7 @@ namespace orPlugin{
     }
 
     // Only for config.size = 3, Vector = tran
-    OpenRAVE::Vector ConfigToRaveVec(configuration config)
+    OpenRAVE::Vector RrtPlanner::ConfigToRaveVec(configuration config)
     {
         OpenRAVE::Vector raveVec;
         raveVec.x = config.at(0);
@@ -569,23 +653,23 @@ namespace orPlugin{
         return raveVec;
     }
 
-
-    OpenRAVE::Vector GetObjectPos(OpenRAVE::RobotBasePtr robotPtr)
+    // Get the end effector pos
+    OpenRAVE::Vector RrtPlanner::GetObjectPos(OpenRAVE::RobotBasePtr robotPtr)
     {
         std::vector<KinBody::LinkPtr> iLPtr = robotPtr->GetLinks();
-        Transform itrans = (iLPtr.at(6))->GetTransform();
+        OpenRAVE::Transform itrans = (iLPtr.at(6))->GetTransform();
         OpenRAVE::Vector ipos = itrans.trans;
         return ipos;
     }
 
-    bool ConstraintViolation(configSet sampleConfig, vector<OpenRAVE::RobotBasePtr> robots, OpenRAVE::EnvironmentBasePtr env)
+    bool RrtPlanner::ConstraintViolation(configSet sampleConfig, vector<OpenRAVE::RobotBasePtr> robots, OpenRAVE::EnvironmentBasePtr env)
     {
         for (int i=0; i<sampleConfig.size(); i++)
         {
             for (int j=i; j<sampleConfig.size(); j++)
             {
 
-                float disMax = plannerSetup.geodesic.at(i*plannerSetup.numGrippers+j)+STRETCHING_THRESHOLD;
+                float disMax = inputParameters_.geodesic.at(i*inputParameters_.numGrippers+j)+STRETCHING_THRESHOLD;
                 // from sample config to object config
                 robots.at(i)->SetActiveDOFValues(ConfigToVec(sampleConfig.at(i)));
                 robots.at(j)->SetActiveDOFValues(ConfigToVec(sampleConfig.at(j)));
@@ -596,16 +680,13 @@ namespace orPlugin{
                 configuration iPos = RaveVecToConfig(iPosRave);
                 configuration jPos = RaveVecToConfig(jPosRave);
 
+                // Geodesic Constraint checking
                 if (Distance(iPos,jPos) > disMax)
                 { return true; }
 
-                // Collision checking
-    //            OpenRAVE::CollisionCheckerBasePtr collisionCheck;
-    //            env->SetCollisionChecker(collisionCheck);
-
-                // ERROR HERE, RAY COLLISION CHECK SHOULD BE FIXED
-    //            OpenRAVE::RAY rayCheck(ConfigToRaveVec(iPos), ConfigToRaveVec(SubtractConfig(jPos,iPos)));
+                // Checking whether obstacle appears in the space between the two robots, should be improved
                 OpenRAVE::RAY rayCheck;
+                // 0.2* ... some offset that the start point is not in contact
                 rayCheck.pos = GetObjectPos(robots.at(i))+0.2*(GetObjectPos(robots.at(j))-(GetObjectPos(robots.at(i))));
                 rayCheck.dir= 0.5*(GetObjectPos(robots.at(j))-(GetObjectPos(robots.at(i))));
                 vector<OpenRAVE::KinBodyPtr> kinbody;
@@ -615,22 +696,18 @@ namespace orPlugin{
                 {
                     if (env->CheckCollision(rayCheck,kinbody.at(kin)))
                     {
-                        double r = rayCheck.dir.lengthsqr2();
-    //                    cout<<"ray collision : " << r << endl;
+//                        double r = rayCheck.dir.lengthsqr2();
+//                        cout<<"ray collision : " << r << endl;
                         return true;
                     }
                 }
-
-    //            if (collisionCheck->CheckCollision(rayCheck)) {return true;}
-    //            if (OpenRAVE::CollisionCheckerBase::CheckCollision(rayCheck)) {return true;}
             }
         }
         return false;
     }
 
-
     // Return true if collision happens
-    bool SetCollisionCheck(vector<RobotBasePtr> robots, EnvironmentBasePtr env)
+    bool RrtPlanner::SetCollisionCheck(vector<RobotBasePtr> robots, EnvironmentBasePtr env)
     {
         for (int i =0; i<robots.size(); i++)
         {
@@ -640,11 +717,6 @@ namespace orPlugin{
         return false;
     }
 
-    */
-
-
-
-    /*
 
 
      ///////////////////////////////////// RRT Planning //////////////////////////
@@ -653,16 +725,15 @@ namespace orPlugin{
      /// \param startConfig
      /// \param goalConfig
      /// \return
-     ///
 
-     std::vector<RRTNode*> RRTPlanning(OpenRAVE::EnvironmentBasePtr env,
+     std::vector<RRTNodePtr> RrtPlanner::RRTPlanning(OpenRAVE::EnvironmentBasePtr env,
          configSet goalConfig, float sampleBias, float stepSize)
      {
          vector<OpenRAVE::RobotBasePtr> robots;
          env->GetRobots(robots);
 
          int numGripper = robots.size();
-         plannerSetup.numGrippers=numGripper;
+         inputParameters_.numGrippers=numGripper;
 
     //     OpenRAVE::RobotBasePtr robot = robots.at(0);
          std::vector<std::vector<double> > startSet;
@@ -674,13 +745,14 @@ namespace orPlugin{
              startSet.push_back(startVec);
          }
 
-         RRTNode *startPtr;
+         RRTNodePtr startPtr;
          RRTNode startNode(SetVecToConfig(startSet));
          startPtr = new RRTNode(startNode);
-         RRTNode* nearestNode;
+         RRTNodePtr nearestNode;
 
-         NodeTree *treePtr;
-         treePtr = new NodeTree(startPtr);
+//         NodeTree *treePtr;
+         ResetPath();
+         treePtr_ = new NodeTree(startPtr);
 
          bool sampleGoal = false;
 
@@ -697,8 +769,6 @@ namespace orPlugin{
 
          while((!findSol)&&(count<1000000))
          {
-    //         if(count%100==1) {cout << "ith enter:------------------ "; cout << count << endl;}
-
              curStep = stepSize;
              float toss = (float)rand()/((float)RAND_MAX);
              configSet sampleConfig;
@@ -708,44 +778,29 @@ namespace orPlugin{
              {
                  sampleGoal = true;
                  sampleConfig = goalConfig;
-    //             cout << "sample goal!!!!" << endl;
              }
 
              else
              {
-    //             sampleConfig = SampleSet(numGripper);
                  sampleConfig = SampleSetWithBase(RandSample(),0);
-                 // Constraint violation & collision status for ray across end effectors
+             //     Constraint violation & collision status for ray across end effectors
                  while (ConstraintViolation(sampleConfig,robots, env))
-                 {
-    //                 cout << "!! ConstraintViolation !!" << endl;
-    //                 sampleConfig = SampleSet(numGripper);
-                     sampleConfig = SampleSetWithBase(RandSample(),0);
-                 }
+                 {  sampleConfig = SampleSetWithBase(RandSample(),0); }
 
-    //             ConfigPrintHelp(sampleConfig.at(0));
+             //    ConfigPrintHelp(sampleConfig.at(0));
                  sampleGoal=false;
              }
 
-             nearestNode = NearestNode(treePtr, sampleConfig);
+             nearestNode = NearestNode(sampleConfig);
 
-    //         cout << "Tree node (start) at:......" << endl;
-    //         SetConfigPrintHelp(treePtr->GetRoot()->GetConfig());
-    //         cout << "Nearest Node at:......" << endl;
-    //         SetConfigPrintHelp(nearestNode->GetConfig());
-    //         cout << "sampleConfig at:......" << endl;
-    //         SetConfigPrintHelp(sampleConfig);
-
-             /// Not use connect, move it here
+             // Not using connect anymore, move it here
 
              stopPtr = nearestNode;
              // if the sampling is at nearest node, return nearest node.
 
              if (!(SetWeightedDis(nearestNode->GetConfig(), sampleConfig)<ERRORTHRESHOLD))
              {
-    //             cout << SetWeightedDis(nearestNode->GetConfig(), sampleConfig) << endl;
 
-    //             SetUnitStep(nearestNode->GetConfig(),sampleConfig, stepSize);
                  stepConfig = SetUnitStep(nearestNode->GetConfig(),sampleConfig, stepSize);
                  bool withinStep = false;
 
@@ -757,30 +812,15 @@ namespace orPlugin{
                      inner_count++;
                      tempNode = new RRTNode(stopPtr->GetConfig());
                      tempNode->AddStep(stepConfig);
-    //                 cout << "***************** " << inner_count << " ************" << endl;
-    //                 ConfigPrintHelp(tempNode->GetConfig().at(0));
-    //                 ConfigPrintHelp(tempNode->GetConfig().at(1));
 
                      if (SetOutBound(tempNode->GetConfig()))
-                     {
-                         delete tempNode;
-    //                     if (sampleGoal) { cout << "out of bound!!" << endl;}
-                         tempNode = stopPtr;
-                         break;
-                     }
+                     {   delete tempNode;   tempNode = stopPtr;   break; }
+
                      if (ConstraintViolation(tempNode->GetConfig(),robots,env))
-                     {
-    //                     cout << "!! ConstraintViolation !!" << endl;
-                         delete tempNode;
-    //                     if (sampleGoal) { cout << "out of bound!!" << endl;}
-                         tempNode = stopPtr;
-                         break;
-                     }
+                     {   delete tempNode;   tempNode = stopPtr;   break; }
 
                      for (int irob=0; irob<robots.size(); irob++)
-                     {
-                         robots.at(irob)->SetActiveDOFValues(ConfigToVec((tempNode->GetConfig()).at(irob)));
-                     }
+                     {   robots.at(irob)->SetActiveDOFValues(ConfigToVec((tempNode->GetConfig()).at(irob))); }
 
                      if(SetCollisionCheck(robots, env))
                      {
@@ -793,12 +833,7 @@ namespace orPlugin{
                              continue;
                          }
                          else
-                         {
-                            delete tempNode;
-     //                       if (sampleGoal) { cout << "Collision!!" << endl;}
-                            tempNode = stopPtr;
-                            break;
-                         }
+                         {  delete tempNode;  tempNode = stopPtr;   break; }
                      }
 
                      // step; revise: no if before
@@ -806,23 +841,22 @@ namespace orPlugin{
                      {
                          tempNode->SetParent(stopPtr);
                          stopPtr = tempNode;
-                         treePtr->Add(tempNode);
-    //                     cout << "Stepping!!" << endl;
+                         treePtr_->Add(tempNode);
                      }
 
                      if ((SetWeightedDis(stopPtr->GetConfig(),sampleConfig))<stepSize)
                      {
-    //                     cout << "distance smaller than step size!!" << endl;
+                     //    cout << "distance smaller than step size!!" << endl;
                          if (sampleGoal)
                          {
-                             RRTNode* show = NearestNode(treePtr, goalConfig);
+                             RRTNode* show = NearestNode(goalConfig);
 
                              tempNode = new RRTNode (goalConfig);
                              tempNode->SetParent(stopPtr);
-                             treePtr->Add(tempNode);
+                             treePtr_->Add(tempNode);
                              findSol = true;
 
-                             show = NearestNode(treePtr, goalConfig);
+                             show = NearestNode(goalConfig);
                          }  // if sample is goal, connect directly
                          else
                          {
@@ -834,7 +868,7 @@ namespace orPlugin{
                              {
                                  tempNode = new RRTNode (sampleConfig);
                                  tempNode->SetParent(stopPtr);
-                                 treePtr->Add(tempNode);
+                                 treePtr_->Add(tempNode);
     //                             cout << "reach nearest point, successfully connect!" << endl;
                              }
                          } // if sample is not goal, check if not collision, connect
@@ -847,27 +881,25 @@ namespace orPlugin{
              count++;
          }// End of large loop
          cout << "RRT sampling size:" ;
-         cout << treePtr->TreeSize() << endl;
+         cout << treePtr_->TreeSize() << endl;
 
-         std::vector<RRTNode*> path;  // debug line
-         if (treePtr->TreeSize()>1)
-         { path = treePtr->GetPath(tempNode);}
+//         std::vector<RRTNode*> path;  // debug line
+         path_.clear();
+         if (treePtr_->TreeSize()>1)
+         { path_ = treePtr_->GetPath(tempNode);}
     //     else { std::vector<RRTNode*> path;}  // debug line
 
          float pathLength = 0;
-         for (int i = 1; i<path.size(); i++)
-         { pathLength = pathLength+SetWeightedDis((path.at(i-1))->GetConfig() ,(path.at(i))->GetConfig()); }
+         for (int i = 1; i<path_.size(); i++)
+         { pathLength = pathLength+SetWeightedDis((path_.at(i-1))->GetConfig() ,(path_.at(i))->GetConfig()); }
          cout << "RRT path size : ";
-         cout << path.size() << endl;
+         cout << path_.size() << endl;
 
-         return path;
-
+         return path_;
      }
 
-
-
-
-    std::vector<RRTNode*> SmoothPath(EnvironmentBasePtr env, std::vector<RRTNode *> &path,float stepSize, int iteration)
+//    std::vector<RRTNode*> SmoothPath(EnvironmentBasePtr env, std::vector<RRTNodePtr> &path,float stepSize, int iteration)
+    std::vector<RRTNode*> RrtPlanner::SmoothPath(EnvironmentBasePtr env, float stepSize, int iteration)
     {
         int index1, index2; // checking node index, 2 is closer to goal
         RRTNode* node1;
@@ -877,20 +909,20 @@ namespace orPlugin{
         bool insert = true;
 
         cout << "treeSize before smooth:" << endl;
-        cout << path.size()<< endl;
+        cout << path_.size()<< endl;
         for (int it = 0; it<iteration; it++ )
         {
             vector<OpenRAVE::RobotBasePtr> robots;
             env->GetRobots(robots);
     //        OpenRAVE::RobotBasePtr robot = robots.at(0);
 
-            index1 = RandNode(path.size());
-            index2 = RandNode(path.size());
-            while(index1==index2) { index2 = RandNode(path.size()); }
+            index1 = RandNode(path_.size());
+            index2 = RandNode(path_.size());
+            while(index1==index2) { index2 = RandNode(path_.size()); }
             if(index1>index2) { int a = index1; index1 = index2; index2 = a; }
 
-            node1=path.at(index1);
-            node2=path.at(index2);
+            node1=path_.at(index1);
+            node2=path_.at(index2);
             configSet stepConfig = SetUnitStep(node1->GetConfig(),node2->GetConfig(),stepSize);
 
             std::vector<RRTNode*> tempPath;
@@ -928,24 +960,25 @@ namespace orPlugin{
 
         }
         cout << "tree size after smooth: +++++++++++++";
-        cout << path.size() <<endl;
+        cout << path_.size() <<endl;
         float pathLength = 0;
-        for (int i = 1; i<path.size(); i++)
-        { pathLength = pathLength+SetWeightedDis((path.at(i-1))->GetConfig() ,(path.at(i))->GetConfig()); }
+        for (int i = 1; i<path_.size(); i++)
+        { pathLength = pathLength+SetWeightedDis((path_.at(i-1))->GetConfig(), (path_.at(i))->GetConfig()); }
         cout << "Smooth path length : ";
         cout << pathLength << endl;
 
-        return path;
+        return path_;
     }
 
 
+    /*
 
     std::vector<RRTNode*> BiRRTPlanning(OpenRAVE::EnvironmentBasePtr env,
         configSet goalConfig, float sampleBias, float stepSize)
     {
         vector<OpenRAVE::RobotBasePtr> robots;
         env->GetRobots(robots);
-    \
+
         int numGripper = robots.size();
         plannerSetup.numGrippers=numGripper;
 

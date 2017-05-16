@@ -296,7 +296,7 @@ namespace orPlugin{
         weight.push_back(0);
     }
 
-    void ParameterSet::InitGeodesic(configSet initConfig)
+    void ParameterSet::InitGeodesic(configSet initConfig, std::vector<RobotBasePtr> robots)
     {
         geodesicConfig=initConfig;
 
@@ -306,13 +306,48 @@ namespace orPlugin{
         {
             for (int j=0; j<numGrippers; j++)
             {
+            //  get end-effector translation
+                robots.at(i)->SetActiveDOFValues(ConfigToVec(initConfig.at(i)));
+                robots.at(j)->SetActiveDOFValues(ConfigToVec(initConfig.at(j)));
+
+                OpenRAVE::Vector iPosRave = GetObjectPos(robots.at(i));
+                OpenRAVE::Vector jPosRave = GetObjectPos(robots.at(j));
+
+                configuration iPos = RaveVecToConfig(iPosRave);
+                configuration jPos = RaveVecToConfig(jPosRave);
+
             // initConfig is in p (object space)
-                float dis = Distance(initConfig.at(i),initConfig.at(j) ) ;
+                float dis = Distance(iPos,jPos) ;
                 geodesic.push_back(dis);
             }
         }
 
     }
+
+    void ParameterSet::SetStart(tConfigSet startSE3)
+    {
+        startSE3_ = startSE3;
+        start_ = SetSE3toVconfig(startSE3);
+    }
+
+    void ParameterSet::SetStart(configSet start)
+    {
+        start_ = start;
+        startSE3_ = SetVtoSE3config(start);
+    }
+
+    void ParameterSet::SetGoal(tConfigSet goalSE3)
+    {
+        goalSE3_ = goalSE3;
+        goal_ = SetSE3toVconfig(goalSE3);
+    }
+
+    void ParameterSet::SetGoal(configSet goal)
+    {
+        goal_ = goal;
+        goalSE3_ = SetVtoSE3config(goal);
+    }
+
 
     ////////////////////////////////// Helper function //////////////////////////
 
@@ -346,8 +381,74 @@ namespace orPlugin{
          return false;
      }
 
+     // Only for config.size = 3, Vector = tran
+     OpenRAVE::Vector ConfigToRaveVec(configuration config)
+     {
+         OpenRAVE::Vector raveVec;
+         raveVec.x = config.at(0);
+         raveVec.y = config.at(1);
+         raveVec.z = config.at(2);
+     //    raveVec.w = 0.0;
+         return raveVec;
+     }
+
+     // Get the end effector pos
+     OpenRAVE::Vector GetObjectPos(OpenRAVE::RobotBasePtr robotPtr)
+     {
+         std::vector<KinBody::LinkPtr> iLPtr = robotPtr->GetLinks();
+         OpenRAVE::Transform itrans = (iLPtr.at(6))->GetTransform();
+         OpenRAVE::Vector ipos = itrans.trans;
+         return ipos;
+     }
+
+     configuration RaveVecToConfig(OpenRAVE::Vector raveVec)
+     {
+         configuration pos;
+         double x=raveVec.x;
+         pos.push_back(x);
+         double y=raveVec.y;
+         pos.push_back(y);
+         double z=raveVec.z;
+         pos.push_back(z);
+         return pos;
+     }
+
+     configuration VecToConfig(std::vector<double> vec)
+     {
+         configuration config;
+         for (int i=0; i<vec.size(); i++)
+         {
+             config.push_back(vec.at(i));
+         }
+         return config;
+     }
+
+     std::vector<double> ConfigToVec(configuration config)
+     {
+         std::vector<double> vec;
+         for (int i=0; i<config.size();i++)
+             vec.push_back(config.at(i));
+         return vec;
+     }
+
+
 
      //////////////////////////////// RrtPlanner ///////////////////////////////
+
+     RrtPlanner::RrtPlanner(OpenRAVE::EnvironmentBasePtr env)
+         :env_(env)
+     {
+         env->GetRobots(robots_);
+     }
+
+     RrtPlanner::RrtPlanner(OpenRAVE::EnvironmentBasePtr env, ParameterSet parameterIn)
+         :env_(env)
+         ,inputParameters_(parameterIn)
+     {
+         env->GetRobots(robots_);
+     }
+
+
 
      void RrtPlanner::ResetPath()
      {
@@ -379,26 +480,6 @@ namespace orPlugin{
              cout << config.at(i) << endl;
          }
      }
-
-
-     configuration RrtPlanner::VecToConfig(std::vector<double> vec)
-     {
-         configuration config;
-         for (int i=0; i<vec.size(); i++)
-         {
-             config.push_back(vec.at(i));
-         }
-         return config;
-     }
-
-     std::vector<double> RrtPlanner::ConfigToVec(configuration config)
-     {
-         std::vector<double> vec;
-         for (int i=0; i<config.size();i++)
-             vec.push_back(config.at(i));
-         return vec;
-     }
-
 
      bool RrtPlanner::OutBound(configuration a)
      {
@@ -456,15 +537,15 @@ namespace orPlugin{
      }
 
 
-     RRTNode* RrtPlanner::NearestNode(configSet config)
+     RRTNode* RrtPlanner::NearestNode(configSet config, NodeTreePtr treePtr)
      {
-         RRTNode* nodePtr=treePtr_->GetRoot();
+         RRTNode* nodePtr=treePtr->GetRoot();
          RRTNode* minNode = nodePtr;
          int index=0;
          float minDis=SetWeightedDis(nodePtr->GetConfig(),config);
-         for(int i=0; i<treePtr_->TreeSize(); i++)
+         for(int i=0; i<treePtr->TreeSize(); i++)
          {
-             nodePtr = treePtr_->GetNode(i);
+             nodePtr = treePtr->GetNode(i);
              float curDis = SetWeightedDis(nodePtr->GetConfig(),config);
              if(curDis<minDis)
              {
@@ -473,7 +554,7 @@ namespace orPlugin{
                  minDis = curDis;
              }
          }
-         return treePtr_->GetNode(index);
+         return treePtr->GetNode(index);
      }
 
      configuration RrtPlanner::RandSample()
@@ -630,39 +711,7 @@ namespace orPlugin{
     ///////////// Rave related function
 
 
-    configuration RrtPlanner::RaveVecToConfig(OpenRAVE::Vector raveVec)
-    {
-        configuration pos;
-        double x=raveVec.x;
-        pos.push_back(x);
-        double y=raveVec.y;
-        pos.push_back(y);
-        double z=raveVec.z;
-        pos.push_back(z);
-        return pos;
-    }
-
-    // Only for config.size = 3, Vector = tran
-    OpenRAVE::Vector RrtPlanner::ConfigToRaveVec(configuration config)
-    {
-        OpenRAVE::Vector raveVec;
-        raveVec.x = config.at(0);
-        raveVec.y = config.at(1);
-        raveVec.z = config.at(2);
-    //    raveVec.w = 0.0;
-        return raveVec;
-    }
-
-    // Get the end effector pos
-    OpenRAVE::Vector RrtPlanner::GetObjectPos(OpenRAVE::RobotBasePtr robotPtr)
-    {
-        std::vector<KinBody::LinkPtr> iLPtr = robotPtr->GetLinks();
-        OpenRAVE::Transform itrans = (iLPtr.at(6))->GetTransform();
-        OpenRAVE::Vector ipos = itrans.trans;
-        return ipos;
-    }
-
-    bool RrtPlanner::ConstraintViolation(configSet sampleConfig, vector<OpenRAVE::RobotBasePtr> robots, OpenRAVE::EnvironmentBasePtr env)
+    bool RrtPlanner::ConstraintViolation(configSet sampleConfig)
     {
         for (int i=0; i<sampleConfig.size(); i++)
         {
@@ -671,11 +720,11 @@ namespace orPlugin{
 
                 float disMax = inputParameters_.geodesic.at(i*inputParameters_.numGrippers+j)+STRETCHING_THRESHOLD;
                 // from sample config to object config
-                robots.at(i)->SetActiveDOFValues(ConfigToVec(sampleConfig.at(i)));
-                robots.at(j)->SetActiveDOFValues(ConfigToVec(sampleConfig.at(j)));
+                robots_.at(i)->SetActiveDOFValues(ConfigToVec(sampleConfig.at(i)));
+                robots_.at(j)->SetActiveDOFValues(ConfigToVec(sampleConfig.at(j)));
 
-                OpenRAVE::Vector iPosRave = GetObjectPos(robots.at(i));
-                OpenRAVE::Vector jPosRave = GetObjectPos(robots.at(j));
+                OpenRAVE::Vector iPosRave = GetObjectPos(robots_.at(i));
+                OpenRAVE::Vector jPosRave = GetObjectPos(robots_.at(j));
 
                 configuration iPos = RaveVecToConfig(iPosRave);
                 configuration jPos = RaveVecToConfig(jPosRave);
@@ -687,19 +736,15 @@ namespace orPlugin{
                 // Checking whether obstacle appears in the space between the two robots, should be improved
                 OpenRAVE::RAY rayCheck;
                 // 0.2* ... some offset that the start point is not in contact
-                rayCheck.pos = GetObjectPos(robots.at(i))+0.2*(GetObjectPos(robots.at(j))-(GetObjectPos(robots.at(i))));
-                rayCheck.dir= 0.5*(GetObjectPos(robots.at(j))-(GetObjectPos(robots.at(i))));
+                rayCheck.pos = GetObjectPos(robots_.at(i))+0.2*(GetObjectPos(robots_.at(j))-(GetObjectPos(robots_.at(i))));
+                rayCheck.dir= 0.5*(GetObjectPos(robots_.at(j))-(GetObjectPos(robots_.at(i))));
                 vector<OpenRAVE::KinBodyPtr> kinbody;
-                env->GetBodies(kinbody);
+                env_->GetBodies(kinbody);
 
                 for (int kin = 0; kin < kinbody.size(); kin++ )
                 {
-                    if (env->CheckCollision(rayCheck,kinbody.at(kin)))
-                    {
-//                        double r = rayCheck.dir.lengthsqr2();
-//                        cout<<"ray collision : " << r << endl;
-                        return true;
-                    }
+                    if (env_->CheckCollision(rayCheck,kinbody.at(kin)))
+                    {   return true;}
                 }
             }
         }
@@ -707,11 +752,11 @@ namespace orPlugin{
     }
 
     // Return true if collision happens
-    bool RrtPlanner::SetCollisionCheck(vector<RobotBasePtr> robots, EnvironmentBasePtr env)
+    bool RrtPlanner::SetCollisionCheck()
     {
-        for (int i =0; i<robots.size(); i++)
+        for (int i =0; i<robots_.size(); i++)
         {
-            if(env->CheckCollision(robots.at(i))||robots.at(i)->CheckSelfCollision())
+            if(env_->CheckCollision(robots_.at(i))||robots_.at(i)->CheckSelfCollision())
             { return true; }
         }
         return false;
@@ -726,27 +771,30 @@ namespace orPlugin{
      /// \param goalConfig
      /// \return
 
-     std::vector<RRTNodePtr> RrtPlanner::RRTPlanning(OpenRAVE::EnvironmentBasePtr env,
-         configSet goalConfig, float sampleBias, float stepSize)
+     std::vector<RRTNodePtr> RrtPlanner::RRTPlanning(ParameterSet parameterIn)
      {
-         vector<OpenRAVE::RobotBasePtr> robots;
-         env->GetRobots(robots);
+         inputParameters_ = parameterIn;
 
-         int numGripper = robots.size();
-         inputParameters_.numGrippers=numGripper;
+//         int numGripper = robots_.size();
+//         inputParameters_.numGrippers=numGripper;
 
     //     OpenRAVE::RobotBasePtr robot = robots.at(0);
-         std::vector<std::vector<double> > startSet;
+    //     std::vector<std::vector<double> > startSet;
 
+         /*
          for (int i =0; i<numGripper; i++)
          {
              std::vector<double> startVec;
              robots.at(i)->GetActiveDOFValues(startVec);
              startSet.push_back(startVec);
          }
+         */
+
+         configSet startSet = inputParameters_.start_;
 
          RRTNodePtr startPtr;
-         RRTNode startNode(SetVecToConfig(startSet));
+//         RRTNode startNode(SetVecToConfig(startSet));
+         RRTNode startNode(startSet);
          startPtr = new RRTNode(startNode);
          RRTNodePtr nearestNode;
 
@@ -759,7 +807,7 @@ namespace orPlugin{
          RRTNode *tempNode;
          RRTNode* stopPtr;
          configSet stepConfig;
-         float curStep=stepSize;
+         float curStep = inputParameters_.stepSize;
 
          bool findSol=false;
          int count = 0;
@@ -769,31 +817,29 @@ namespace orPlugin{
 
          while((!findSol)&&(count<1000000))
          {
-             curStep = stepSize;
+             curStep = inputParameters_.stepSize;
              float toss = (float)rand()/((float)RAND_MAX);
              configSet sampleConfig;
              configSet objectSampleConfig;
 
-             if(toss<sampleBias)
+             if(toss<inputParameters_.sampleBias)
              {
                  sampleGoal = true;
-                 sampleConfig = goalConfig;
+                 sampleConfig = inputParameters_.goal_;
              }
 
              else
              {
                  sampleConfig = SampleSetWithBase(RandSample(),0);
              //     Constraint violation & collision status for ray across end effectors
-                 while (ConstraintViolation(sampleConfig,robots, env))
+                 while (ConstraintViolation(sampleConfig))
                  {  sampleConfig = SampleSetWithBase(RandSample(),0); }
 
              //    ConfigPrintHelp(sampleConfig.at(0));
                  sampleGoal=false;
              }
 
-             nearestNode = NearestNode(sampleConfig);
-
-             // Not using connect anymore, move it here
+             nearestNode = NearestNode(sampleConfig, treePtr_);
 
              stopPtr = nearestNode;
              // if the sampling is at nearest node, return nearest node.
@@ -801,7 +847,7 @@ namespace orPlugin{
              if (!(SetWeightedDis(nearestNode->GetConfig(), sampleConfig)<ERRORTHRESHOLD))
              {
 
-                 stepConfig = SetUnitStep(nearestNode->GetConfig(),sampleConfig, stepSize);
+                 stepConfig = SetUnitStep(nearestNode->GetConfig(),sampleConfig, inputParameters_.stepSize);
                  bool withinStep = false;
 
                  if((SetWeightedDis(stopPtr->GetConfig(),sampleConfig))<STEPSIZE) {withinStep=true;}
@@ -816,13 +862,13 @@ namespace orPlugin{
                      if (SetOutBound(tempNode->GetConfig()))
                      {   delete tempNode;   tempNode = stopPtr;   break; }
 
-                     if (ConstraintViolation(tempNode->GetConfig(),robots,env))
+                     if (ConstraintViolation(tempNode->GetConfig()))
                      {   delete tempNode;   tempNode = stopPtr;   break; }
 
-                     for (int irob=0; irob<robots.size(); irob++)
-                     {   robots.at(irob)->SetActiveDOFValues(ConfigToVec((tempNode->GetConfig()).at(irob))); }
+                     for (int irob=0; irob<robots_.size(); irob++)
+                     {   robots_.at(irob)->SetActiveDOFValues(ConfigToVec((tempNode->GetConfig()).at(irob))); }
 
-                     if(SetCollisionCheck(robots, env))
+                     if(SetCollisionCheck())
                      {
                          if (curStep>0.1)
                          {
@@ -837,34 +883,34 @@ namespace orPlugin{
                      }
 
                      // step; revise: no if before
-                     if ((SetWeightedDis(stopPtr->GetConfig(),sampleConfig))>stepSize)
+                     if ((SetWeightedDis(stopPtr->GetConfig(),sampleConfig))>inputParameters_.stepSize)
                      {
                          tempNode->SetParent(stopPtr);
                          stopPtr = tempNode;
                          treePtr_->Add(tempNode);
                      }
 
-                     if ((SetWeightedDis(stopPtr->GetConfig(),sampleConfig))<stepSize)
+                     if ((SetWeightedDis(stopPtr->GetConfig(),sampleConfig))<inputParameters_.stepSize)
                      {
                      //    cout << "distance smaller than step size!!" << endl;
                          if (sampleGoal)
                          {
-                             RRTNode* show = NearestNode(goalConfig);
+                             RRTNode* show = NearestNode(inputParameters_.goal_, treePtr_);
 
-                             tempNode = new RRTNode (goalConfig);
+                             tempNode = new RRTNode (inputParameters_.goal_);
                              tempNode->SetParent(stopPtr);
                              treePtr_->Add(tempNode);
                              findSol = true;
 
-                             show = NearestNode(goalConfig);
+                             show = NearestNode(inputParameters_.goal_, treePtr_);
                          }  // if sample is goal, connect directly
                          else
                          {
-                             for (int irob=0; irob<robots.size(); irob++)
+                             for (int irob=0; irob<robots_.size(); irob++)
                              {
-                                 robots.at(irob)->SetActiveDOFValues(ConfigToVec((tempNode->GetConfig()).at(irob)));
+                                 robots_.at(irob)->SetActiveDOFValues(ConfigToVec((tempNode->GetConfig()).at(irob)));
                              }
-                             if(!(SetCollisionCheck(robots, env)))
+                             if(!(SetCollisionCheck()))
                              {
                                  tempNode = new RRTNode (sampleConfig);
                                  tempNode->SetParent(stopPtr);
@@ -899,7 +945,7 @@ namespace orPlugin{
      }
 
 //    std::vector<RRTNode*> SmoothPath(EnvironmentBasePtr env, std::vector<RRTNodePtr> &path,float stepSize, int iteration)
-    std::vector<RRTNode*> RrtPlanner::SmoothPath(EnvironmentBasePtr env, float stepSize, int iteration)
+    std::vector<RRTNode*> RrtPlanner::SmoothPath()
     {
         int index1, index2; // checking node index, 2 is closer to goal
         RRTNode* node1;
@@ -910,10 +956,10 @@ namespace orPlugin{
 
         cout << "treeSize before smooth:" << endl;
         cout << path_.size()<< endl;
-        for (int it = 0; it<iteration; it++ )
+        for (int it = 0; it<inputParameters_.iteration; it++ )
         {
-            vector<OpenRAVE::RobotBasePtr> robots;
-            env->GetRobots(robots);
+    //        vector<OpenRAVE::RobotBasePtr> robots;
+    //        env_->GetRobots(robots);
     //        OpenRAVE::RobotBasePtr robot = robots.at(0);
 
             index1 = RandNode(path_.size());
@@ -923,7 +969,7 @@ namespace orPlugin{
 
             node1=path_.at(index1);
             node2=path_.at(index2);
-            configSet stepConfig = SetUnitStep(node1->GetConfig(),node2->GetConfig(),stepSize);
+            configSet stepConfig = SetUnitStep(node1->GetConfig(),node2->GetConfig(),inputParameters_.stepSize);
 
             std::vector<RRTNode*> tempPath;
             tempPath.clear();
@@ -932,7 +978,7 @@ namespace orPlugin{
             insert = true;
 
             // step from node 1 to node 2
-            while (SetWeightedDis(stopNode->GetConfig(),node2->GetConfig())>stepSize)
+            while (SetWeightedDis(stopNode->GetConfig(),node2->GetConfig()) > inputParameters_.stepSize)
             {
                 tempNode = new RRTNode(SetSumConfig(stopNode->GetConfig(),stepConfig));
                 if (SetOutBound(tempNode->GetConfig())){
@@ -941,12 +987,11 @@ namespace orPlugin{
                     insert = false;
                     break;
                 }
-    //            robot->SetActiveDOFValues(ConfigToVec(tempNode->GetConfig()));
-                for (int irob=0; irob<robots.size(); irob++)
-                { robots.at(irob)->SetActiveDOFValues(ConfigToVec((tempNode->GetConfig()).at(irob)));}
+                for (int irob=0; irob<robots_.size(); irob++)
+                { robots_.at(irob)->SetActiveDOFValues(ConfigToVec((tempNode->GetConfig()).at(irob)));}
 
     //            if(env->CheckCollision(robot)||robot->CheckSelfCollision())
-                if(SetCollisionCheck(robots,env))
+                if(SetCollisionCheck())
                 {
                     delete tempNode;
                     tempNode=stopNode;
@@ -971,17 +1016,17 @@ namespace orPlugin{
     }
 
 
-    /*
 
-    std::vector<RRTNode*> BiRRTPlanning(OpenRAVE::EnvironmentBasePtr env,
-        configSet goalConfig, float sampleBias, float stepSize)
+
+    std::vector<RRTNode*> RrtPlanner::BiRRTPlanning(ParameterSet parameterIn)
     {
-        vector<OpenRAVE::RobotBasePtr> robots;
-        env->GetRobots(robots);
+//        vector<OpenRAVE::RobotBasePtr> robots;
+//        env->GetRobots(robots);
 
-        int numGripper = robots.size();
-        plannerSetup.numGrippers=numGripper;
+        int numGripper = robots_.size();
+        inputParameters_.numGrippers=numGripper;
 
+        /*
         std::vector<std::vector<double> > startSet;
 
         for (int i =0; i<numGripper; i++)
@@ -990,20 +1035,24 @@ namespace orPlugin{
             robots.at(i)->GetActiveDOFValues(startVec);
             startSet.push_back(startVec);
         }
+        */
+
+        treeA_->ResetTree();
+        treeB_->ResetTree();
 
         RRTNode* startPtr;
-        startPtr = new RRTNode(SetVecToConfig(startSet));
-        NodeTree treeA(startPtr);
+        startPtr = new RRTNode(inputParameters_.start_);
+        treeA_ = new NodeTree(startPtr);
         RRTNode* goalPtr;
-        goalPtr = new RRTNode(goalConfig);
-        NodeTree treeB(goalPtr);
+        goalPtr = new RRTNode(inputParameters_.goal_);
+        treeB_ = new NodeTree(goalPtr);
         NodeTree* treeStepPtr;  // for extend a step
         NodeTree* treeConPtr;   // for connect
 
         configSet stepConfig;
         configSet sampleConfig;
         bool connect=false;
-        float curStep = stepSize;
+        float curStep = inputParameters_.stepSize;
         bool sample=true;
         bool AisCon = true;
 
@@ -1017,67 +1066,59 @@ namespace orPlugin{
 
         while(!connect)
         {
-            if (treeA.TreeSize()>treeB.TreeSize())
-            { treeStepPtr = &treeA; treeConPtr = &treeB; AisCon=false; }
-            else { treeStepPtr = &treeB; treeConPtr = &treeA; AisCon=true; }
+            if (treeA_->TreeSize()>treeB_->TreeSize())
+            { treeStepPtr = treeA_; treeConPtr = treeB_; AisCon=false; }
+            else { treeStepPtr = treeB_; treeConPtr = treeA_; AisCon=true; }
             sample=true;
 
             // Extend the stepping node for one step
             while(sample)
             {
-                sampleConfig = SampleSet(numGripper);
+                sampleConfig = SampleSet(inputParameters_.numGrippers);
     //            sampleConfig = SampleSetWithBase(RandSample(),0);
                 // Constraint violation & collision status for ray across end effectors
-                while (ConstraintViolation(sampleConfig,robots, env))
+                while (ConstraintViolation(sampleConfig))
                 {
-                     sampleConfig = SampleSet(numGripper);
+                     sampleConfig = SampleSet(inputParameters_.numGrippers);
     //                sampleConfig = SampleSetWithBase(RandSample(),0);
                 }
 
-                nearestNode = NearestNode(treeStepPtr, sampleConfig);
-                stepConfig = SetUnitStep(nearestNode->GetConfig(),sampleConfig,stepSize);
+                nearestNode = NearestNode(sampleConfig, treeStepPtr);
+                stepConfig = SetUnitStep(nearestNode->GetConfig(),sampleConfig,inputParameters_.stepSize);
                 stepStop = new RRTNode(SetSumConfig(nearestNode->GetConfig(), stepConfig));
 
                 if(SetOutBound(stepStop->GetConfig()))
+                {  delete stepStop;    continue; }
+
+                for (int irob=0; irob<robots_.size(); irob++)
                 {
-                    delete stepStop;
-                    continue;
+                    robots_.at(irob)->SetActiveDOFValues(ConfigToVec((tempPtr->GetConfig()).at(irob)));
                 }
 
-                for (int irob=0; irob<robots.size(); irob++)
-                {
-                    robots.at(irob)->SetActiveDOFValues(ConfigToVec((tempPtr->GetConfig()).at(irob)));
-                }
-
-                if(SetCollisionCheck(robots, env))
-                {
-                    delete stepStop;
-                    continue;
-                }
+                if(SetCollisionCheck())
+                {   delete stepStop;   continue; }
                 stepStop->SetParent(nearestNode);
                 treeStepPtr->Add(stepStop);
                 sample=false;
                 break;
             }
 
-            nearestNode = NearestNode(treeConPtr, stepStop->GetConfig());
+            nearestNode = NearestNode(stepStop->GetConfig(), treeConPtr);
             conStop = nearestNode;
 
             if(SetWeightedDis(conStop->GetConfig(),stepStop->GetConfig())<ERRORTHRESHOLD)
             {connect =true; break;}
 
             // Connect the connecting tree to the stepping node
-            stepConfig = SetUnitStep(conStop->GetConfig(),stepStop->GetConfig(),stepSize);
-            while(SetWeightedDis(conStop->GetConfig(),stepStop->GetConfig())>stepSize)
+            stepConfig = SetUnitStep(conStop->GetConfig(),stepStop->GetConfig(),inputParameters_.stepSize);
+            while(SetWeightedDis(conStop->GetConfig(),stepStop->GetConfig())>inputParameters_.stepSize)
             {
                 tempPtr = new RRTNode(SetSumConfig(conStop->GetConfig(),stepConfig));
 
-                for (int irob=0; irob<robots.size(); irob++)
-                {
-                    robots.at(irob)->SetActiveDOFValues(ConfigToVec((tempPtr->GetConfig()).at(irob)));
-                }
+                for (int irob=0; irob<robots_.size(); irob++)
+                {   robots_.at(irob)->SetActiveDOFValues(ConfigToVec((tempPtr->GetConfig()).at(irob)));  }
 
-                if(SetCollisionCheck(robots, env))
+                if(SetCollisionCheck())
                 {
                     if(curStep>0.2)
                     {
@@ -1097,45 +1138,41 @@ namespace orPlugin{
                 conStop=tempPtr;
                 treeConPtr->Add(tempPtr);
             }
-            if(SetWeightedDis(conStop->GetConfig(),stepStop->GetConfig())<=stepSize)
-            {
-                connect=true;
-              //  cout << "constop, step stop are: "<< endl;
-              //  ConfigPrintHelp(conStop->GetConfig());
-              //  ConfigPrintHelp(stepStop->GetConfig());
-            }
+            if(SetWeightedDis(conStop->GetConfig(),stepStop->GetConfig()) <= inputParameters_.stepSize)
+            {  connect=true; }
         }
 
         cout << "Bi-RRT sampling size:" ;
         cout << treeStepPtr->TreeSize()+treeConPtr->TreeSize() << endl;
 
-        std::vector<RRTNode*> pathS;
+        path_.clear();
+//        std::vector<RRTNode*> pathS;
         std::vector<RRTNode*> pathE;
         if (AisCon)
         {
-            pathS = treeConPtr->GetPath(conStop);
+            path_ = treeConPtr->GetPath(conStop);
             pathE = treeStepPtr->GetPath(stepStop);
         }
         else
         {
-            pathS = treeStepPtr->GetPath(stepStop);
+            path_ = treeStepPtr->GetPath(stepStop);
             pathE = treeConPtr->GetPath(conStop);
         }
         for (int i =pathE.size(); i>0; i--)
-        { pathS.push_back(pathE.at(i-1));  }
+        { path_.push_back(pathE.at(i-1));  }
 
         float pathLength = 0;
-        for (int i = 1; i<pathS.size(); i++)
-        { pathLength = pathLength+SetWeightedDis((pathS.at(i-1))->GetConfig() ,(pathS.at(i))->GetConfig()); }
+        for (int i = 1; i<path_.size(); i++)
+        { pathLength = pathLength+SetWeightedDis((path_.at(i-1))->GetConfig() ,(path_.at(i))->GetConfig()); }
         cout << "Bi-RRT path length : ";
         cout << pathLength << endl;
         cout << "path size : ";
-        cout << pathS.size() <<endl;
+        cout << path_.size() <<endl;
 
-        return pathS;
+        return path_;
 
     }
-    */
+
 
 
 }

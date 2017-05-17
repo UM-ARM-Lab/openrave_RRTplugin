@@ -36,15 +36,15 @@ public:
 
     bool MyCommand(std::ostream& sout, std::istream& sinput);
 
-    void SetBoundary(std::vector<double> lowerBoundIn, std::vector<double> upperBoundIn);
+    void SetBoundary(std::vector<double> &lowerBoundIn, std::vector<double> &upperBoundIn);
 
-    void SetWeight(std::vector<double> weightIn);
+    void SetWeight(std::vector<double> &weightIn);
 
-    void SetGeodesic(tConfigSet SE3Geodesic);
+    void SetGeodesic(tConfigSet &SE3Geodesic);
 
-    void SetStarSE3(tConfigSet SE3start);
+    void SetStarSE3(tConfigSet &SE3start);
 
-    void SetGoalSE3(tConfigSet SE3goal);
+    void SetGoalSE3(tConfigSet &SE3goal);
 
     void SetStepSize(float stepSize = STEPSIZE);
 
@@ -55,6 +55,8 @@ public:
     void SetSmoothFlag(int isSmooth = 0);
 
     void SetBiRRTFlag(int isBiRRT = 0);
+
+    void SetPath(std::vector<RRTNodePtr> & pathIn);
 
     void RrtPlanning();
 

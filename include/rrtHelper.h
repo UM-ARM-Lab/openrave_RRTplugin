@@ -2,7 +2,7 @@
 #define RRTHELPER_H
 
 #include <openrave/openrave.h>
-#include <openrave/plugin.h>
+//#include <openrave/plugin.h>
 
 #include <iostream>
 #include <stdio.h>
@@ -10,7 +10,6 @@
 
 #include <boost/bind.hpp>
 #include <time.h>
-#include <stdlib.h>
 
 #include <arc_utilities/arc_helpers.hpp>
 
@@ -32,14 +31,17 @@ namespace orPlugin {
 
     typedef std::vector<double> configuration;
 //    typedef Eigen::Affine3d tConfiguration;
-    typedef std::pair<configuration, configuration> configSet;
+    typedef std::vector<configuration> configSet;
     typedef std::pair<Eigen::Affine3d, Eigen::Affine3d> tConfigSet;
 
     typedef configSet* configSetPtr;
     typedef tConfigSet* tConfigSetPtr;
 
-    configuration TtoVconfig(Eigen::Affine3d tConfig);
-    configSet SetTtoVconfig(tConfigSet tConfigSetIn);
+    configuration SE3toVconfig(Eigen::Affine3d tConfig);
+    configSet SetSE3toVconfig(tConfigSet tConfigSetIn);
+
+    Eigen::Affine3d VtoSE3config(configuration config);
+    tConfigSet SetVtoSE3config(configSet config);
 
     class RRTNode;
     typedef RRTNode* RRTNodePtr;
@@ -47,30 +49,31 @@ namespace orPlugin {
 
     class RRTNode
     {
+
     public:
         RRTNode();
         RRTNode(configSet configSetIn);
         ~RRTNode();
 
-        bool SameNode(RRTNodePtr checkNode);
+//        bool SameNode(RRTNodePtr checkNode);
         void SetConfig(configSet config);
         configSet GetConfig();
         void AddStep(configSet s);
 
-        void SetParent(RRTNodePtr);
+        void SetParent(RRTNodePtr parentNode);
         RRTNodePtr GetParent();
 
         // NEWLY DECLARED FUNCTION, TO BE IMPLEMENT
-        bool IsChild(RRTNodePtr);
-        void SetChild(RRTNodePtr);
-        std::vector<RRTNodePtr> GetChild();
+//        bool IsChild(RRTNodePtr nodePtr);
+//        void SetChild(RRTNodePtr nodePtr);
+//        std::vector<RRTNodePtr> GetChild();
 
     private:
         configSet configSet_;
         RRTNodePtr parent_;
 
         // NEWLY DECLARED VARIABLE
-        std::vector<RRTNodePtr> children_;
+//        std::vector<RRTNodePtr> children_;
     };
 
     class NodeTree
@@ -82,6 +85,7 @@ namespace orPlugin {
 
         RRTNodePtr GetRoot();
 
+        void ResetTree();
         bool InTree(RRTNodePtr testNode);
         bool Add(RRTNodePtr growNode);
         bool Remove(RRTNodePtr remNode);
@@ -103,10 +107,17 @@ namespace orPlugin {
     {
     public:
         ParameterSet();
+
     //    ~ParameterSet();
 
         // Geodesic of (i,j) gripper stored in i*n+j; n is num of grippers
-        void InitGeodesic(configSet initConfig);
+        void InitGeodesic(configSet initConfig, std::vector<RobotBasePtr> robots);
+
+        void SetStart(tConfigSet startSE3);
+        void SetStart(configSet start);
+
+        void SetGoal(tConfigSet goalSE3);
+        void SetGoal(configSet goal);
 
         // To simplify the problem, I assume all grippers having the same boundary
         std::vector<double> lowerBound;
@@ -117,11 +128,45 @@ namespace orPlugin {
         configSet geodesicConfig;
         std::vector<float> geodesic;
 
+        float sampleBias = 0.1;
+        float stepSize = 0.3;
+        int iteration = 200;
+
+        configSet start_;
+        configSet goal_;
+        tConfigSet startSE3_;
+        tConfigSet goalSE3_;
+
+
+
     };
+
+    typedef NodeTree* NodeTreePtr;
+
+    /////////////////////////// Helper function /////////////////////////////////
+
+    float Distance(configuration A, configuration B);
+    bool SameNode(RRTNodePtr baseNode, RRTNodePtr checkNode);
+
+    OpenRAVE::Vector ConfigToRaveVec(configuration config);
+
+    OpenRAVE::Vector GetObjectPos(OpenRAVE::RobotBasePtr robotPtr);
+
+    configuration RaveVecToConfig(OpenRAVE::Vector raveVec);
+
+    configuration VecToConfig(std::vector<double> vec);
+
+    std::vector<double> ConfigToVec(configuration config);
+
+
 
     class RrtPlanner
     {
     public:
+
+        RrtPlanner(OpenRAVE::EnvironmentBasePtr env);
+
+        RrtPlanner(OpenRAVE::EnvironmentBasePtr env, ParameterSet parameterIn);
 
         ///////////////////////// Parameters input
         void SetParameters(ParameterSet parameterIn);
@@ -129,6 +174,8 @@ namespace orPlugin {
         ParameterSet GetParameters();
 
         ///////////////////////// RRT planner helper function, for single configuration
+
+        void ResetPath();
 
         int RandNode(int size);
 
@@ -138,9 +185,6 @@ namespace orPlugin {
 
         void ConfigPrintHelp(configuration config);
 
-        configuration VecToConfig(std::vector<double> vec);
-
-        std::vector<double> ConfigToVec(configuration config);
         // if configuration violate joint limits
         bool OutBound(configuration a);
         bool SameDirection(configuration a, configuration b);
@@ -149,14 +193,17 @@ namespace orPlugin {
         // A-B
         configuration SubtractConfig(configuration A, configuration B);
 
-        float Distance(configuration A, configuration B);
-        float WeightedDis(configuration A, configuration B);
-
         // return unitstep vector, the step size is in #define, could be adjust later
         configuration UnitStep(configuration start, configuration goal, float stepSize);
 
+//        float Distance(configuration A, configuration B);
+
+        float WeightedDis(configuration A, configuration B);
 
         ////////////////////// Helper function for configuration SET (Pair)
+        ///
+
+//        bool SameNode(RRTNodePtr baseNode, RRTNodePtr checkNode);
 
         void SetConfigPrintHelp(configSet config);
 
@@ -175,7 +222,7 @@ namespace orPlugin {
         configSet SetSubtractConfig(configSet A, configSet B);  // A-B
 
         // Nearest Node on the tree
-        RRTNode* NearestNode(NodeTree* treeA, configSet config);
+        RRTNode* NearestNode(configSet config, NodeTreePtr treePtr);
 
         configSet SampleSet(int gripperSize);
 
@@ -187,45 +234,35 @@ namespace orPlugin {
         // for the ray connecting two gasped area true if violation happens
         // sampleConfig here is in object config space;
 
-        configuration RaveVecToConfig(OpenRAVE::Vector raveVec);
 
-        OpenRAVE::Vector ConfigToRaveVec(configuration config);
-
-        OpenRAVE::Vector GetObjectPos(OpenRAVE::RobotBasePtr robotPtr);
-
-        bool ConstraintViolation(configSet sampleConfig, vector<RobotBasePtr> robots, EnvironmentBasePtr env);
+        bool ConstraintViolation(configSet sampleConfig);
 
         // Set collision check helper
-        bool SetCollisionCheck(vector<RobotBasePtr> robots, EnvironmentBasePtr env);
+        bool SetCollisionCheck();
 
         ///////////////////////////////////// RRT Planning //////////////////////////
 
-        std::vector<RRTNode *> RRTPlanning(OpenRAVE::EnvironmentBasePtr env,
-                         configSet goalConfig, float sampleBias, float stepSize);
+        std::vector<RRTNode *> RRTPlanning(ParameterSet parameterIn);
         //tree* RRTPlanning(OpenRAVE::EnvironmentBasePtr env,
         //                 configuration goalConfig, float sampleBias, float stepSize, configuration weightIn);
 
 
-        std::vector<RRTNode*> SmoothPath(EnvironmentBasePtr env, std::vector<RRTNode *> &path,float stepSize, int iteration);
+//        std::vector<RRTNode*> SmoothPath(EnvironmentBasePtr env, std::vector<RRTNode *> &path,float stepSize, int iteration);
+        std::vector<RRTNode*> SmoothPath();
 
-
-        std::vector<RRTNode*> BiRRTPlanning(OpenRAVE::EnvironmentBasePtr env,
-            configSet goalConfig, float sampleBias, float stepSize);
-
-
-
-
-
+        std::vector<RRTNode*> BiRRTPlanning(ParameterSet parameterIn);
 
 
     protected:
         ParameterSet inputParameters_;
+        NodeTree* treePtr_;
+        std::vector<RRTNodePtr> path_;
 
+        NodeTree* treeA_;
+        NodeTree* treeB_;
 
-
-
-
-
+        OpenRAVE::EnvironmentBasePtr env_;
+        std::vector<RobotBasePtr> robots_;
 
     };
 

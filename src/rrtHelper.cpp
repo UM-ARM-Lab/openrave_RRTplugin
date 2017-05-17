@@ -435,16 +435,16 @@ namespace orPlugin{
 
      //////////////////////////////// RrtPlanner ///////////////////////////////
 
-     RrtPlanner::RrtPlanner(OpenRAVE::EnvironmentBasePtr env)
-         :env_(env)
+     RrtPlanner::init(OpenRAVE::EnvironmentBasePtr env)
      {
+         env_ = env;
          env->GetRobots(robots_);
      }
 
-     RrtPlanner::RrtPlanner(OpenRAVE::EnvironmentBasePtr env, ParameterSet parameterIn)
-         :env_(env)
-         ,inputParameters_(parameterIn)
+     RrtPlanner::init(OpenRAVE::EnvironmentBasePtr env, ParameterSet parameterIn)
      {
+         env_ = env;
+         inputParameters_ = parameterIn;
          env->GetRobots(robots_);
      }
 
@@ -779,16 +779,19 @@ namespace orPlugin{
 //         inputParameters_.numGrippers=numGripper;
 
     //     OpenRAVE::RobotBasePtr robot = robots.at(0);
-    //     std::vector<std::vector<double> > startSet;
 
-         /*
-         for (int i =0; i<numGripper; i++)
+         if (inputParameters_.start_.empty())
          {
-             std::vector<double> startVec;
-             robots.at(i)->GetActiveDOFValues(startVec);
-             startSet.push_back(startVec);
+
+             for (int i =0; i<inputParameters_.numGrippers; i++)
+             {
+                 std::vector<double> startVec;
+                 robots.at(i)->GetActiveDOFValues(startVec);
+                 inputParameters_.start_.push_back(startVec);
+             }
+             inputParameters_.startSE3_ = SetVtoSE3config(inputParameters_.start_);
          }
-         */
+
 
          configSet startSet = inputParameters_.start_;
 

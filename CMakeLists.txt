@@ -51,10 +51,11 @@ openrave_plugin(${PROJECT_NAME}_plugin
 #    include/openrave_rrtplugin/or_rrt_plugin.h
     include/openrave_rrtplugin/orplugin.h
 #    include/openrave_rrtplugin/rrtHelpler.h
-#    include/rrtHelpler.h
+#    include/openrave_rrtplugin/rrtHelpler.hpp
+    include/rrtHelpler.h
 #    src/or_rrt_plugin.cpp
     src/orplugin.cpp
-    src/rrtHelper.h
+#    src/rrtHelper.h
     src/rrtHelper.cpp
 )
 target_link_libraries(${PROJECT_NAME}_plugin

@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <vector>
 
+#include <openrave/plugin.h>
+
 #include <boost/bind.hpp>
 #include <time.h>
 

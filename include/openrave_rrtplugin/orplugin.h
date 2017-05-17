@@ -1,8 +1,7 @@
 #ifndef ORPLUGIN_H
 #define ORPLUGIN_H
 
-#include "openrave_rrtplugin/include/rrtHelper.h"
-
+#include "openrave_rrtplugin/include/openrave_rrtplugin/rrtHelper.h"
 
 #include <openrave/plugin.h>
 //#include <boost/bind.hpp>
@@ -28,6 +27,8 @@ public:
         penv_ = penv;
         penv_->GetRobots(robots_);
 
+        rrtPlanner_.init(penv);
+
         RegisterCommand("MyCommand",boost::bind(&rrtPlugin::MyCommand,this,_1,_2),
                         "This is an example command");
     }
@@ -39,19 +40,21 @@ public:
 
     void SetWeight(std::vector<double> weightIn);
 
-    void SetGeodesic(tConfigSet SE3Geodesic, std::vector<RobotBasePtr> robots);
+    void SetGeodesic(tConfigSet SE3Geodesic);
 
     void SetStarSE3(tConfigSet SE3start);
 
     void SetGoalSE3(tConfigSet SE3goal);
 
-    void SetStepSize(float stepSize);
+    void SetStepSize(float stepSize = STEPSIZE);
 
-    void SetSampleBias(float sampleBias);
+    void SetSampleBias(float sampleBias = SAMPLEBIAS);
 
-    void SetSmoothFlag(int isSmooth);
+    void SetNumIteration(int numIterationIn = NUMITERATION);
 
-    void SetBiRRTFlag(int isBiRRT);
+    void SetSmoothFlag(int isSmooth = 0);
+
+    void SetBiRRTFlag(int isBiRRT = 0);
 
     void RrtPlanning();
 
@@ -63,13 +66,14 @@ public:
 protected:
     std::vector<RobotBasePtr> robots_;
     EnvironmentBasePtr penv_;
-    ParameterSet inputParameter_;
 
     RrtPlanner rrtPlanner_;
 
     std::vector<RRTNodePtr> nodePath_;
     std::vector<tConfigSet> SE3Path_;
     std::vector<configSet> configPath_;
+
+    void SetPath(std::vector<RRTNodePtr> &pathIn);
 
 };
 

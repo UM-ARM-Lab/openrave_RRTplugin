@@ -50,13 +50,13 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -O0 -g -Wall -Wextra -Wpedant
 openrave_plugin(${PROJECT_NAME}_plugin
 #    include/openrave_rrtplugin/or_rrt_plugin.h
     include/openrave_rrtplugin/orplugin.h
-#    include/openrave_rrtplugin/rrtHelpler.h
+    include/openrave_rrtplugin/rrtHelpler.h
 #    include/openrave_rrtplugin/rrtHelpler.hpp
-    include/rrtHelpler.h
+#    include/rrtHelpler.h
 #    src/or_rrt_plugin.cpp
     src/orplugin.cpp
 #    src/rrtHelper.h
-    src/rrtHelper.cpp
+#    src/rrtHelper.cpp
 )
 target_link_libraries(${PROJECT_NAME}_plugin
 #    ${PROJECT_NAME}

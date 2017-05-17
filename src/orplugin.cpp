@@ -36,46 +36,66 @@ bool rrtPlugin::MyCommand(std::ostream& sout, std::istream& sinput)
 
 void rrtPlugin::SetBoundary(std::vector<double> lowerBoundIn, std::vector<double> upperBoundIn)
 {
-    inputParameter_.lowerBound = lowerBoundIn;
-    inputParameter_.upperBound = upperBoundIn;
+    rrtPlanner_.inputParameters_.lowerBound = lowerBoundIn;
+    rrtPlanner_.inputParameters_.upperBound = upperBoundIn;
 }
 
 void rrtPlugin::SetWeight(std::vector<double> weightIn)
 {
-    inputParameter_.weight = weightIn;
+    rrtPlanner_.inputParameters_.weight = weightIn;
 }
 
-/*
-void rrtPlugin::SetGeodesic(tConfigSet SE3Geodesic, std::vector<RobotBasePtr> robots)
+
+void rrtPlugin::SetGeodesic(tConfigSet SE3Geodesic)
 {
-    inputParameter_.geodesicConfig = SetSE3toVconfig(SE3Geodesic);
-    inputParameter_.InitGeodesic(inputParameter_.geodesicConfig, robots);
+    rrtPlanner_.inputParameters_.geodesicConfig = SetSE3toVconfig(SE3Geodesic);
+    rrtPlanner_.inputParameters_.InitGeodesic(rrtPlanner_.inputParameters_.geodesicConfig, robots_);
 
 }
-*/
 
-void rrtPlugin::SetGeodesic(tConfigSet SE3Geodesic, std::vector<RobotBasePtr> robots)
+void rrtPlugin::SetStarSE3(tConfigSet SE3start)
 {
-//    inputParameter_.InitGeodesic(SetSE3toVconfig(SE3Geodesic), robots);
+    rrtPlanner_.inputParameters_.startSE3_ = SE3start;
+    rrtPlanner_.inputParameters_.start_ = SetSE3toVconfig(SEstart);
 }
 
-/*
-void SetStarSE3(tConfigSet SE3start);
+void rrtPlugin::SetGoalSE3(tConfigSet SE3goal)
+{
+    rrtPlanner_.inputParameters_.goalSE3_ = SE3goal;
+    rrtPlanner_.inputParameters_.goal_ = SetSE3toVconfig(SE3goal);
+}
 
-void SetGoalSE3(tConfigSet SE3goal);
+void rrtPlugin::SetStepSize(float stepSize)
+{
+    rrtPlanner_.inputParameters_.stepSize = stepSize;
+}
 
-void SetStepSize(float stepSize);
+void rrtPlugin::SetSampleBias(float sampleBias)
+{
+    rrtPlanner_.inputParameters_.sampleBias = sampleBias;
+}
 
-void SetSampleBias(float sampleBias);
+void rrtPlugin::SetNumIteration(int numIterationIn = NUMITERATION)
+{
+    rrtPlanner_.inputParameters_.iteration = numIterationIn;
+}
 
-void SetSmoothFlag(int isSmooth);
 
-void SetBiRRTFlag(int isBiRRT);
+void rrtPlugin::SetSmoothFlag(int isSmooth)
+{
+    rrtPlanner_.inputParameters_.isSmooth = isSmooth;
+}
 
-void RrtPlanning();
+void rrtPlugin::SetBiRRTFlag(int isBiRRT)
+{
+    rrtPlanner_.inputParameters_.isBiRRT = isBiRRT;
+}
 
-void SmoothPath();
+void rrtPlugin::RrtPlanning();
 
-void BiRRtPlanning();
+void rrtPlugin::SmoothPath();
 
-*/
+void rrtPlugin::BiRRtPlanning();
+
+void rrtPlugin::SetPath(std::vector<RRTNodePtr> &pathIn);
+

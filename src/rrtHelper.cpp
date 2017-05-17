@@ -1,4 +1,4 @@
-#include "rrtHelper.h"
+#include "openrave_rrtplugin/include/openrave_rrtplugin/rrtHelper.h"
 
 /*
 #include <openrave/openrave.h>

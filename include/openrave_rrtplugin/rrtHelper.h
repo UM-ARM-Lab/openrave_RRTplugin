@@ -2,13 +2,11 @@
 #define RRTHELPER_H
 
 #include <openrave/openrave.h>
-//#include <openrave/plugin.h>
+#include <openrave/plugin.h>
 
 #include <iostream>
 #include <stdio.h>
 #include <vector>
-
-#include <openrave/plugin.h>
 
 #include <boost/bind.hpp>
 #include <time.h>
@@ -18,9 +16,9 @@
 #define ERRORTHRESHOLD 0.002
 #define GOALERROR 0.3
 #define PI 3.141592653
-#define STEPSIZE 0.2
-#define SAMPLEBIAS 0.15
-#define PERIOD 100
+#define STEPSIZE 0.3
+#define SAMPLEBIAS 0.1
+#define NUMITERATION 200
 #define DOFCONFIG 6
 #define STRETCHING_THRESHOLD 0
 
@@ -130,9 +128,11 @@ namespace orPlugin {
         configSet geodesicConfig;
         std::vector<float> geodesic;
 
-        float sampleBias = 0.1;
-        float stepSize = 0.3;
-        int iteration = 200;
+        float sampleBias = SAMPLEBIAS;
+        float stepSize = STEPSIZE;
+        int iteration = NUMITERATION;
+        int isSmooth = 0;
+        int isBiRRT = 0;
 
         configSet start_;
         configSet goal_;
@@ -166,9 +166,9 @@ namespace orPlugin {
     {
     public:
 
-        RrtPlanner(OpenRAVE::EnvironmentBasePtr env);
+        void init(OpenRAVE::EnvironmentBasePtr env);
 
-        RrtPlanner(OpenRAVE::EnvironmentBasePtr env, ParameterSet parameterIn);
+        void init(OpenRAVE::EnvironmentBasePtr env, ParameterSet parameterIn);
 
         ///////////////////////// Parameters input
         void SetParameters(ParameterSet parameterIn);
@@ -255,16 +255,17 @@ namespace orPlugin {
         std::vector<RRTNode*> BiRRTPlanning(ParameterSet parameterIn);
 
 
-    protected:
+    public:
         ParameterSet inputParameters_;
+        OpenRAVE::EnvironmentBasePtr env_;
+        std::vector<RobotBasePtr> robots_;
+
+    protected:
         NodeTree* treePtr_;
         std::vector<RRTNodePtr> path_;
 
         NodeTree* treeA_;
         NodeTree* treeB_;
-
-        OpenRAVE::EnvironmentBasePtr env_;
-        std::vector<RobotBasePtr> robots_;
 
     };
 

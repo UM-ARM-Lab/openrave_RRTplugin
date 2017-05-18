@@ -1,4 +1,4 @@
-#include "openrave_rrtplugin/include/openrave_rrtplugin/rrtHelper.h"
+#include "openrave_rrtplugin/rrtHelper.h"
 
 /*
 #include <openrave/openrave.h>
@@ -435,13 +435,13 @@ namespace orPlugin{
 
      //////////////////////////////// RrtPlanner ///////////////////////////////
 
-     RrtPlanner::init(OpenRAVE::EnvironmentBasePtr env)
+     void RrtPlanner::init(OpenRAVE::EnvironmentBasePtr env)
      {
          env_ = env;
          env->GetRobots(robots_);
      }
 
-     RrtPlanner::init(OpenRAVE::EnvironmentBasePtr env, ParameterSet parameterIn)
+     void RrtPlanner::init(OpenRAVE::EnvironmentBasePtr env, ParameterSet parameterIn)
      {
          env_ = env;
          inputParameters_ = parameterIn;
@@ -786,7 +786,7 @@ namespace orPlugin{
              for (int i =0; i<inputParameters_.numGrippers; i++)
              {
                  std::vector<double> startVec;
-                 robots.at(i)->GetActiveDOFValues(startVec);
+                 robots_.at(i)->GetActiveDOFValues(startVec);
                  inputParameters_.start_.push_back(startVec);
              }
              inputParameters_.startSE3_ = SetVtoSE3config(inputParameters_.start_);

@@ -1,7 +1,7 @@
 //#include "rrtHelper.h"
 #include "openrave_rrtplugin/orplugin.h"
 
-#include <boost/bind.hpp>
+//#include <boost/bind.hpp>
 //#include <victor_hardware_interface/MotionCommand.h>
 #include <arc_utilities/ros_helpers.hpp>
 #include <arc_utilities/pretty_print.hpp>
@@ -56,7 +56,7 @@ void rrtPlugin::SetGeodesic(tConfigSet &SE3Geodesic)
 void rrtPlugin::SetStarSE3(tConfigSet &SE3start)
 {
     rrtPlanner_.inputParameters_.startSE3_ = SE3start;
-    rrtPlanner_.inputParameters_.start_ = SetSE3toVconfig(SEstart);
+    rrtPlanner_.inputParameters_.start_ = SetSE3toVconfig(SE3start);
 }
 
 void rrtPlugin::SetGoalSE3(tConfigSet &SE3goal)
@@ -75,7 +75,7 @@ void rrtPlugin::SetSampleBias(float sampleBias)
     rrtPlanner_.inputParameters_.sampleBias = sampleBias;
 }
 
-void rrtPlugin::SetNumIteration(int numIterationIn = NUMITERATION)
+void rrtPlugin::SetNumIteration(int numIterationIn)
 {
     rrtPlanner_.inputParameters_.iteration = numIterationIn;
 }
@@ -91,7 +91,7 @@ void rrtPlugin::SetBiRRTFlag(int isBiRRT)
     rrtPlanner_.inputParameters_.isBiRRT = isBiRRT;
 }
 
-void rrtPlugin::SetPath(std::vector<RRTNodePtr> &pathIn)
+void rrtPlugin::SetPath(std::vector<RRTNodePtr> pathIn)
 {
     nodePath_ = pathIn;
     configPath_.clear();

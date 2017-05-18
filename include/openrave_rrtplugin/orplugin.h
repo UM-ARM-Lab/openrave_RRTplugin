@@ -1,14 +1,15 @@
 #ifndef ORPLUGIN_H
 #define ORPLUGIN_H
 
-#include "openrave_rrtplugin/include/openrave_rrtplugin/rrtHelper.h"
+#include "openrave_rrtplugin/rrtHelper.h"
 
 #include <openrave/plugin.h>
-//#include <boost/bind.hpp>
+#include <boost/bind.hpp>
 
 #include <atomic>
 #include <thread>
 #include <mutex>
+#include <time.h>
 
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
@@ -56,7 +57,7 @@ public:
 
     void SetBiRRTFlag(int isBiRRT = 0);
 
-    void SetPath(std::vector<RRTNodePtr> & pathIn);
+    void SetPath(std::vector<RRTNodePtr> pathIn);
 
     void RrtPlanning();
 

@@ -146,9 +146,11 @@ namespace orPlugin {
 
     /////////////////////////// Helper function /////////////////////////////////
 
+    // Get these two functions to both Node and Planner
     float Distance(configuration A, configuration B);
     bool SameNode(RRTNodePtr baseNode, RRTNodePtr checkNode);
 
+    // Don't use these functions anymore
     OpenRAVE::Vector ConfigToRaveVec(configuration config);
 
     OpenRAVE::Vector GetObjectPos(OpenRAVE::RobotBasePtr robotPtr);
